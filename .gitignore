@@ -224,3 +224,4 @@ __marimo__/
 .venv/
 dbt_project/.user.yml
 dbt_project/logs/
+data/
