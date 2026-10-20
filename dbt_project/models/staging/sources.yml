@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: online_retail_ii_year_2009_2010
+      - name: online_retail_ii_year_2010_2011
