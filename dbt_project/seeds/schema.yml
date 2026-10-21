@@ -1,0 +1,19 @@
+version: 2
+
+seeds:
+  - name: non_product_stock_codes
+    columns:
+      - name: stock_code
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_transactions')
+                field: stock_code
+      - name: item_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [shipping, fee, adjustment, discount, sample, test, voucher]
