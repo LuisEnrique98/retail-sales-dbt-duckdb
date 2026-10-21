@@ -18,3 +18,32 @@ models:
           - accepted_values:
               arguments:
                 values: [product, shipping, fee, adjustment, discount, sample, test, voucher]
+                
+  - name: dim_date
+    columns:
+      - name: date_day
+        data_tests: [unique, not_null]
+
+  - name: fct_sales
+    columns:
+      - name: invoice
+        data_tests: [not_null]
+      - name: stock_code
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: stock_code
+      - name: purchase_date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_day
+      - name: transaction_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [sale, cancellation, cancellation_anomaly, adjustment, zero_price]
