@@ -22,6 +22,19 @@ unioned as (
     union all
     select invoice, stock_code, description, quantity, invoice_date, price, customer_id, country
     from second_sheet_new_rows
+),
+
+final as(
+    select
+        invoice,
+        upper(stock_code) as stock_code,
+        description,
+        quantity,
+        invoice_date,
+        price,
+        customer_id,
+        country
+    from unioned
 )
 
-select * from unioned
+select * from final
