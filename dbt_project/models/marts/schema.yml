@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: dim_products
+    description: >
+      One row per stock code. Description is the most representative one
+      (prefers lines with a price, then frequency, then recency).
+      Non-product codes (shipping, fees, adjustments, etc.) are flagged
+      with is_product = false.
+    columns:
+      - name: stock_code
+        data_tests: [unique, not_null]
+      - name: is_product
+        data_tests: [not_null]
+      - name: item_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [product, shipping, fee, adjustment, discount, sample, test, voucher]
