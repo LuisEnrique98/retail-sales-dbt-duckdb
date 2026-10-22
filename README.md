@@ -77,7 +77,7 @@ El código de este repositorio se distribuye bajo licencia MIT (ver `LICENSE`). 
 │   │   ├── staging/           # fuentes, modelos por hoja, unión y tests
 │   │   └── marts/             # fct_sales, dim_products, dim_date y tests
 │   ├── seeds/                 # non_product_stock_codes
-│   └── tests/                 # tests propios (totales de filas)
+│   └── tests/                 # tests propios (totales de filas y limpieza de códigos)
 ├── requirements.txt
 └── README.md
 ```
@@ -132,7 +132,7 @@ El pipeline completo también se ejecuta automáticamente en GitHub Actions en c
 - **ELT en lugar de ETL:** `raw` es una copia fiel del Excel (todo como texto) y las transformaciones ocurren dentro de DuckDB con dbt, lo que deja cada paso trazable.
 - **Una tabla `raw` por hoja:** la unión es una transformación, así que se hace en staging y no al cargar.
 - **Capas separadas:** `raw` queda intacto, `staging` solo ordena y tipifica, y la lógica de negocio vive en `marts`.
-- **Mayúsculas en `stock_code`:** se normaliza con `upper()` en el paso final de `stg_transactions`, después de quitar el solape, para que códigos que solo difieren en mayúsculas (por ejemplo `M` y `m`) no se traten como distintos.
+- **Limpieza de `stock_code` y `description`:** se aplica `trim` y `upper()` en el paso final de `stg_transactions`, después de quitar el solape, para que códigos que solo difieren en espacios o mayúsculas (por ejemplo `47503J` y `47503J `, o `M` y `m`) no se traten como distintos. Se hace al final para no alterar la deduplicación entre hojas.
 - **Granularidad a nivel de línea de factura:** permite analizar por producto, país y fecha, y calcular el ticket por factura.
 - **Clasificación de transacciones:** `transaction_type` separa ventas, cancelaciones, ajustes y líneas sin precio, para que los ingresos brutos y netos no se mezclen con movimientos que no son ventas.
 - **Descripción de cada producto:** cuando un código tiene varias descripciones, se elige la que aparece en más líneas con precio, luego la más frecuente, luego la más reciente, y por último el orden alfabético, para que el resultado sea siempre el mismo.
@@ -141,7 +141,7 @@ El pipeline completo también se ejecuta automáticamente en GitHub Actions en c
 
 ## Calidad de datos
 
-Tests en dbt: no nulos, unicidad de claves en las dimensiones, integridad referencial entre el hecho y sus dimensiones, valores aceptados en `transaction_type` e `item_type`, y dos tests propios que verifican los totales de filas.
+Tests en dbt: no nulos, unicidad de claves en las dimensiones, integridad referencial entre el hecho y sus dimensiones, valores aceptados en `transaction_type` e `item_type`, y tres tests propios: dos que verifican los totales de filas y uno que comprueba que los códigos de producto no tengan espacios ni minúsculas.
 
 **Hallazgos**
 
@@ -154,6 +154,7 @@ Tests en dbt: no nulos, unicidad de claves en las dimensiones, integridad refere
 | Código `B` (deuda incobrable) | 6 líneas con importes grandes, cinco negativos y uno positivo. Se tratan como ajustes contables |
 | Líneas con precio 0 y cantidad positiva | 2.631 líneas; solo 70 tienen cliente. Se clasifican aparte como `zero_price` |
 | Factura "C" con cantidad positiva | 1 caso; se marca como `cancellation_anomaly` |
+| Espacios y mayúsculas en los códigos | El código `47503J` aparecía duplicado por un espacio al final, y había variantes que solo diferían en mayúsculas (por ejemplo `M` y `m`). Se normalizan en staging y un test verifica que `dim_products` no tenga códigos sin limpiar |
 
 **Líneas por `transaction_type`**
 
