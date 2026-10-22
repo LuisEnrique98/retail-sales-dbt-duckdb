@@ -4,7 +4,7 @@
 
 End-to-end ELT pipeline on the UCI Online Retail II dataset: Python ingestion, DuckDB storage, dbt transformations, data quality tests and CI with GitHub Actions.
 
-> **Estado:** pipeline funcional y automatizado. Dashboard pendiente.
+> **Estado:** pipeline funcional y automatizado, con dashboard en Power BI.
 
 **English summary:** Python loads the two sheets of the Online Retail II Excel file into DuckDB (raw layer, all text). dbt cleans and types them (staging), removes a 22,523-row overlap between sheets and builds a star schema (`fct_sales`, `dim_products`, `dim_date`). Data quality tests run on every pull request in GitHub Actions.
 
@@ -42,7 +42,7 @@ flowchart LR
 - **Dimensiones:** `dim_products` (una fila por código de producto, con una marca `is_product` y un `item_type`) y `dim_date`.
 - **Seed:** `non_product_stock_codes`, la lista de códigos que no son mercadería (envíos, comisiones, ajustes, descuentos, muestras, pruebas y vales de regalo).
 
-El país se mantiene como columna de `fct_sales`, porque solo hay unos 43 valores y no tienen atributos propios: una dimensión aparte solo agregaría un join. No hay `dim_customers`: del cliente solo se tiene su ID, sin atributos propios, así que una dimensión no agregaría información. Los análisis por cliente se hacen directamente sobre `fct_sales`, excluyendo las líneas sin `customer_id`.
+El país se mantiene como columna de `fct_sales`, porque solo hay 43 valores y no tienen atributos propios: una dimensión aparte solo agregaría un join. No hay `dim_customers`: del cliente solo se tiene su ID, sin atributos propios, así que una dimensión no agregaría información. Los análisis por cliente se hacen directamente sobre `fct_sales`, excluyendo las líneas sin `customer_id`.
 
 ## Stack
 
@@ -51,6 +51,7 @@ El país se mantiene como columna de `fct_sales`, porque solo hay unos 43 valore
 - **dbt-core** (adaptador `dbt-duckdb`) para transformaciones, seeds y tests
 - **GitHub Actions** para ejecutar el pipeline en cada Pull Request
 - **Git / GitHub** para control de versiones
+- **Power BI** para la visualización
 
 ## Dataset
 
@@ -58,7 +59,7 @@ Chen, D. (2012). *Online Retail II* [Dataset]. UCI Machine Learning Repository. 
 
 Licencia del dataset: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Contiene las transacciones de una tienda en línea del Reino Unido entre el 01/12/2009 y el 09/12/2011: 1.067.371 filas en dos hojas de un Excel.
 
-Los datos **no se incluyen en este repositorio**; se descargan desde UCI. Se transforman en las capas staging y marts de este proyecto (renombrado de columnas, conversión de tipos, unión de hojas, clasificación de transacciones y cálculos).
+Los datos **no se incluyen en este repositorio**. Se descargan desde UCI. Se transforman en las capas staging y marts de este proyecto (renombrado de columnas, conversión de tipos, unión de hojas, clasificación de transacciones y cálculos).
 
 El código de este repositorio se distribuye bajo licencia MIT (ver `LICENSE`). La licencia del dataset aplica únicamente a los datos.
 
@@ -68,6 +69,7 @@ El código de este repositorio se distribuye bajo licencia MIT (ver `LICENSE`). 
 .
 ├── .github/workflows/ci.yml   # pipeline automático
 ├── data/                      # datos descargados y convertidos (no versionado)
+├── docs/                      # capturas del dashboard
 ├── ingestion/
 │   └── ingest.py              # Excel -> CSV -> DuckDB (esquema raw)
 ├── dbt_project/
@@ -149,12 +151,13 @@ Tests en dbt: no nulos, unicidad de claves en las dimensiones, integridad refere
 |---|---|
 | Hojas solapadas | Las dos hojas coinciden del 01/12/2010 al 09/12/2010: 22.523 filas idénticas. Se conserva una sola copia: 1.067.371 − 22.523 = **1.044.848** filas, verificado con un test |
 | Códigos que no son productos | Envíos (`POST`, `DOT`, `C2`), comisiones, ajustes, descuentos, muestras, pruebas y vales de regalo. Se clasifican con un seed |
-| Descripciones empatadas | 5 códigos tenían dos descripciones igual de frecuentes; se resuelven con la regla de desempate descrita arriba |
-| Líneas negativas sin factura "C" | 3.393 líneas, todas con precio 0 y sin cliente (2.633 sin descripción; entre las que sí la tienen predominan notas como `damaged`, `missing` o `check`). Se tratan como ajustes de inventario |
+| Descripciones empatadas | 5 códigos tenían dos descripciones igual de frecuentes. Se resuelven con la regla de desempate descrita arriba |
+| Líneas negativas sin factura "C" | 3.393 líneas, todas con precio 0 y sin cliente (2.633 sin descripción. Entre las que sí la tienen predominan notas como `damaged`, `missing` o `check`). Se tratan como ajustes de inventario |
 | Código `B` (deuda incobrable) | 6 líneas con importes grandes, cinco negativos y uno positivo. Se tratan como ajustes contables |
-| Líneas con precio 0 y cantidad positiva | 2.631 líneas; solo 70 tienen cliente. Se clasifican aparte como `zero_price` |
-| Factura "C" con cantidad positiva | 1 caso; se marca como `cancellation_anomaly` |
+| Líneas con precio 0 y cantidad positiva | 2.631 líneas, solo 70 tienen cliente. Se clasifican aparte como `zero_price` |
+| Factura "C" con cantidad positiva | 1 caso, se marca como `cancellation_anomaly` |
 | Espacios y mayúsculas en los códigos | El código `47503J` aparecía duplicado por un espacio al final, y había variantes que solo diferían en mayúsculas (por ejemplo `M` y `m`). Se normalizan en staging y un test verifica que `dim_products` no tenga códigos sin limpiar |
+| Pico de cancelaciones en enero de 2011 | La tasa llega al 19 % frente al 3-10 % del resto de los meses. Una sola venta de 74.215 unidades (£77.184) se canceló 16 minutos después, y eso infla a la vez las ventas brutas y las cancelaciones del mes. Sin ese par, la tasa sería de cerca del 8,8 %. El resto del pico viene de cargos `AMAZONFEE` y ajustes manuales (`M`) que entran como cancelaciones |
 
 **Líneas por `transaction_type`**
 
@@ -167,7 +170,22 @@ Tests en dbt: no nulos, unicidad de claves en las dimensiones, integridad refere
 | `cancellation_anomaly` | 1 |
 | **Total** | **1.044.848** |
 
-**Limitaciones:** la clasificación de ajustes y de líneas sin precio se infiere de los datos y de sus descripciones, y no se pudo confirmar con quien generó el dataset. Hay líneas sin `customer_id`, por lo que cualquier análisis por cliente no las incluiría.
+**Limitaciones:** la clasificación de ajustes y de líneas sin precio se infiere de los datos y de sus descripciones, y no se pudo confirmar con quien generó el dataset. Hay líneas sin `customer_id`, por lo que cualquier análisis por cliente no las incluiría. Las ventas y cancelaciones incluyen cargos que no corresponden a mercadería, como envíos, comisiones y ajustes manuales. El análisis por producto, en cambio, excluye estos cargos.
+
+## Dashboard
+
+Dashboard en Power BI sobre `fct_sales`, `dim_products` y `dim_date`, exportados desde DuckDB. Responde las cuatro preguntas de negocio. Esta etapa es manual y no forma parte del pipeline automatizado.
+
+![Dashboard](docs/dashboard.png)
+
+**Definiciones**
+
+- **Ventas brutas:** líneas de tipo `sale`.
+- **Ventas netas:** `sale` + `cancellation`, excluye ajustes y líneas sin precio.
+- **Tasa de cancelación:** cancelaciones sobre ventas brutas.
+- **Periodo:** del 01/12/2009 al 30/11/2011. Se excluye diciembre de 2011 por ser un mes parcial.
+
+Las cifras del dashboard se validaron contra consultas SQL en DuckDB.
 
 ## Roadmap
 
@@ -175,7 +193,7 @@ Tests en dbt: no nulos, unicidad de claves en las dimensiones, integridad refere
 - [x] Capa staging, unión de hojas y tests de calidad
 - [x] Modelo dimensional (marts) y clasificación de transacciones
 - [x] Automatización con GitHub Actions
-- [ ] Dashboard
+- [x] Dashboard
 
 ## Autor
 
