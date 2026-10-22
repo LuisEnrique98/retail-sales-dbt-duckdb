@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Descargar dataset
+        run: |
+          mkdir -p data/raw
+          curl -fL --retry 3 -o dataset.zip "https://archive.ics.uci.edu/static/public/502/online+retail+ii.zip"
+          unzip -o dataset.zip -d data/raw
+          ls -lh data/raw
+      
+      - name: Restaurar caché de CSV convertidos
+        uses: actions/cache@v4
+        with:
+          path: data/converted
+          key: converted-csv-${{ hashFiles('ingestion/ingest.py') }}
+
+      - name: Ingesta a DuckDB
+        run: python ingestion/ingest.py
+
+      - name: dbt seed
+        working-directory: dbt_project
+        run: dbt seed --profiles-dir .
+      
+      - name: dbt run
+        working-directory: dbt_project
+        run: dbt run --profiles-dir .
+
+      - name: dbt test
+        working-directory: dbt_project
+        run: dbt test --profiles-dir .
