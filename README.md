@@ -152,12 +152,12 @@ Tests en dbt: no nulos, unicidad de claves en las dimensiones, integridad refere
 | Hojas solapadas | Las dos hojas coinciden del 01/12/2010 al 09/12/2010: 22.523 filas idénticas. Se conserva una sola copia: 1.067.371 − 22.523 = **1.044.848** filas, verificado con un test |
 | Códigos que no son productos | Envíos (`POST`, `DOT`, `C2`), comisiones, ajustes, descuentos, muestras, pruebas y vales de regalo. Se clasifican con un seed |
 | Descripciones empatadas | 5 códigos tenían dos descripciones igual de frecuentes. Se resuelven con la regla de desempate descrita arriba |
-| Líneas negativas sin factura "C" | 3.393 líneas, todas con precio 0 y sin cliente (2.633 sin descripción. Entre las que sí la tienen predominan notas como `damaged`, `missing` o `check`). Se tratan como ajustes de inventario |
+| Líneas negativas sin factura "C" | 3.393 líneas, todas con precio 0 y sin cliente. De ellas, 2.633 no tienen descripción y las demás traen notas como `damaged`, `missing` o `check`. Se tratan como ajustes de inventario |
 | Código `B` (deuda incobrable) | 6 líneas con importes grandes, cinco negativos y uno positivo. Se tratan como ajustes contables |
 | Líneas con precio 0 y cantidad positiva | 2.631 líneas, solo 70 tienen cliente. Se clasifican aparte como `zero_price` |
 | Factura "C" con cantidad positiva | 1 caso, se marca como `cancellation_anomaly` |
 | Espacios y mayúsculas en los códigos | El código `47503J` aparecía duplicado por un espacio al final, y había variantes que solo diferían en mayúsculas (por ejemplo `M` y `m`). Se normalizan en staging y un test verifica que `dim_products` no tenga códigos sin limpiar |
-| Pico de cancelaciones en enero de 2011 | La tasa llega al 19 % frente al 3-10 % del resto de los meses. Una sola venta de 74.215 unidades (£77.184) se canceló 16 minutos después, y eso infla a la vez las ventas brutas y las cancelaciones del mes. Sin ese par, la tasa sería de cerca del 8,8 %. El resto del pico viene de cargos `AMAZONFEE` y ajustes manuales (`M`) que entran como cancelaciones |
+| Pico de cancelaciones en enero de 2011 | La tasa llega al 19 % frente al 3-10 % del resto de los meses. Una sola venta de 74.215 unidades (£77.184) se canceló 16 minutos después, y eso infla a la vez las ventas brutas y las cancelaciones del mes. Sin ese par, la tasa sería de cerca del 8,8 %. Entre las demás cancelaciones del mes hay cargos `AMAZONFEE` y ajustes manuales (`M`), que entran como cancelaciones |
 
 **Líneas por `transaction_type`**
 
@@ -186,6 +186,13 @@ Dashboard en Power BI sobre `fct_sales`, `dim_products` y `dim_date`, exportados
 - **Periodo:** del 01/12/2009 al 30/11/2011. Se excluye diciembre de 2011 por ser un mes parcial.
 
 Las cifras del dashboard se validaron contra consultas SQL en DuckDB.
+
+## Resultados
+
+- **Ventas por mes:** entre diciembre de 2009 y noviembre de 2011 se vendieron £19,88 millones brutos y £18,62 millones netos de cancelaciones. Noviembre es el mes más alto en ambos años (£1,47 millones en 2010 y £1,51 millones en 2011, en ventas brutas).
+- **Países:** United Kingdom concentra cerca del 85 % de las ventas netas (£15,8 millones). Le siguen EIRE (£603 mil), Netherlands (£537 mil), Germany (£405 mil) y France (£315 mil).
+- **Productos:** los más vendidos son `REGENCY CAKESTAND 3 TIER` (£309 mil), `WHITE HANGING HEART T-LIGHT HOLDER` (£250 mil) y `JUMBO BAG RED RETROSPOT` (£179 mil), contando solo artículos que son mercadería.
+- **Cancelaciones:** el 6,3 % de las ventas brutas se canceló. Mes a mes se mantiene entre el 3 % y el 10 %, salvo enero de 2011, que llega al 19 % por una sola venta cancelada (ver Calidad de datos).
 
 ## Roadmap
 
